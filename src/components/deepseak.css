@@ -1,0 +1,109 @@
+.container {
+  width: 90vh;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.18);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  overflow: hidden;
+}
+
+.chat-area {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 32px 20px 16px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: #e0e0e0 #ffffff00;
+}
+
+.chat-area::-webkit-scrollbar {
+  width: 6px;
+}
+.chat-area::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 3px;
+}
+
+.message {
+  max-width: 80%;
+  padding: 14px 20px;
+  border-radius: 22px;
+  font-size: 1.08rem;
+  line-height: 1.6;
+  word-break: break-word;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  opacity: 0;
+  animation: fadeIn 0.5s forwards;
+}
+
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+
+.message.user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #6dd5ed 0%, #2193b0 100%);
+  color: #fff;
+  border-bottom-right-radius: 8px;
+  border-top-right-radius: 32px;
+  border-top-left-radius: 32px;
+}
+
+.message.bot {
+  align-self: flex-start;
+  background: linear-gradient(135deg, #f8ffae 0%, #43cea2 100%);
+  color: #222;
+  border-bottom-left-radius: 8px;
+  border-top-right-radius: 32px;
+  border-top-left-radius: 32px;
+}
+
+.input-area {
+  display: flex;
+  padding: 18px 20px;
+  background: rgba(255,255,255,0.85);
+  border-top: 1.5px solid #e0e0e0;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.04);
+}
+
+.input-area input {
+  flex: 1;
+  padding: 12px 18px;
+  border-radius: 24px;
+  border: 1.5px solid #d1d5db;
+  font-size: 1.08rem;
+  outline: none;
+  margin-right: 10px;
+  background: rgba(255,255,255,0.9);
+  transition: border 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+
+.input-area input:focus {
+  border: 1.5px solid #43cea2;
+  box-shadow: 0 2px 12px rgba(67,206,162,0.08);
+}
+
+.input-area button {
+  background: linear-gradient(135deg, #43cea2 0%, #185a9d 100%);
+  color: #fff;
+  border: none;
+  border-radius: 24px;
+  padding: 12px 28px;
+  font-size: 1.08rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  box-shadow: 0 2px 8px rgba(67,206,162,0.08);
+}
+
+.input-area button:hover {
+  background: linear-gradient(135deg, #185a9d 0%, #43cea2 100%);
+  transform: translateY(-2px) scale(1.04);
+}

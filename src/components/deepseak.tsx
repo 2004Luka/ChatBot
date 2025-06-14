@@ -1,0 +1,89 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { marked } from 'marked';
+import './deepseak.css';
+interface Message {
+  sender: 'user' | 'bot';
+  content: string;
+} 
+
+const Deepseek = () => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const chatAreaRef = useRef<HTMLDivElement>(null);
+
+
+
+  useEffect(() => {
+    if (chatAreaRef.current) {
+      chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
+    }
+  }, [messages]);
+  async function sendMessage() {
+    if (!input.trim()) return;
+    const userMessage = input;
+    setMessages((msgs) => [...msgs, { sender: 'user', content: userMessage }]);
+    setInput('');
+    setMessages((msgs) => [...msgs, { sender: 'bot', content: 'Thinking...' }]);
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${import.meta.env.VITE_API_KEY}`,
+          "HTTP-Referer": "<YOUR_SITE_URL>",
+          "X-Title": "<YOUR_SITE_NAME>",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          "model": "deepseek/deepseek-r1-0528:free",
+          "messages": [{ "role": "user", "content": userMessage }]
+        })
+      });
+      const data = await response.json();
+      const markdownText = data.choices[0]?.message?.content || 'No response from the model';
+      setMessages((msgs) => [
+        ...msgs.slice(0, -1), // Remove 'Thinking...'
+        { sender: 'bot', content: markdownText }
+      ]);
+    } catch (error: any) {
+      setMessages((msgs) => [
+        ...msgs.slice(0, -1),
+        { sender: 'bot', content: 'Error: ' + error.message }
+      ]);
+    }
+  }
+
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      sendMessage();
+    }
+  }
+
+  return (
+    <div className="container">
+      <div className="chat-area" ref={chatAreaRef} id="chat-area">
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`message ${msg.sender}`}
+            dangerouslySetInnerHTML={msg.sender === 'bot' ? { __html: marked.parse(msg.content, { async: false }) } : undefined}
+          >
+            {msg.sender === 'user' ? msg.content : null}
+          </div>
+        ))}
+      </div>
+      <div className="input-area">
+        <input
+          id="input"
+          type="text"
+          placeholder="Type your message..."
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleInputKeyDown}
+        />
+        <button onClick={sendMessage}>Send</button>
+      </div>
+    </div>
+  );
+};
+
+export default Deepseek; 
