@@ -7,16 +7,34 @@ interface Message {
   content: string;
 } 
 
+function markdownToPlainText(markdown: string): string {
+  const html = marked.parse(markdown, { async: false });
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  return tempDiv.textContent || tempDiv.innerText || '';
+}
+
 const Deepseek = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const chatAreaRef = useRef<HTMLDivElement>(null);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (chatAreaRef.current) {
       chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const copyToClipboard = async (text: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIdx(idx);
+      setTimeout(() => setCopiedIdx(null), 1200);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
 
   async function sendMessage() {
     if (!input.trim()) return;
@@ -65,7 +83,17 @@ const Deepseek = () => {
           <div key={idx} className={`message ${msg.sender}`}>
             <div className="message-content">
               {msg.sender === 'bot' ? (
-                <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content, { async: false }) }} />
+                <>
+                  <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content, { async: false }) }} />
+                  <button
+                    className="copy-button"
+                    onClick={() => copyToClipboard(markdownToPlainText(msg.content), idx)}
+                    style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
+                    title="Copy to clipboard"
+                  >
+                    {copiedIdx === idx ? 'Copied!' : 'Copy'}
+                  </button>
+                </>
               ) : (
                 msg.content
               )}
