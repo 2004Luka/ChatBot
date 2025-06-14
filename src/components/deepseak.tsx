@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { marked } from 'marked';
 import './deepseak.css';
+
 interface Message {
   sender: 'user' | 'bot';
   content: string;
@@ -11,13 +12,12 @@ const Deepseek = () => {
   const [input, setInput] = useState('');
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
-
-
   useEffect(() => {
     if (chatAreaRef.current) {
       chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
     }
   }, [messages]);
+
   async function sendMessage() {
     if (!input.trim()) return;
     const userMessage = input;
@@ -62,12 +62,14 @@ const Deepseek = () => {
     <div className="container">
       <div className="chat-area" ref={chatAreaRef} id="chat-area">
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`message ${msg.sender}`}
-            dangerouslySetInnerHTML={msg.sender === 'bot' ? { __html: marked.parse(msg.content, { async: false }) } : undefined}
-          >
-            {msg.sender === 'user' ? msg.content : null}
+          <div key={idx} className={`message ${msg.sender}`}>
+            <div className="message-content">
+              {msg.sender === 'bot' ? (
+                <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content, { async: false }) }} />
+              ) : (
+                msg.content
+              )}
+            </div>
           </div>
         ))}
       </div>
