@@ -493,7 +493,6 @@
   }
 }
 
-/* Mobile optimizations */
 @media (max-width: 768px) {
   .message-content {
     font-size: 14px;
@@ -516,7 +515,6 @@
     padding: 6px;
   }
 
-  /* Ensure tables are scrollable on mobile */
   .message.bot .message-content table {
     display: block;
     width: 100%;
@@ -525,7 +523,6 @@
   }
 }
 
-/* Very small mobile devices */
 @media (max-width: 320px) {
   .message-content {
     padding: 6px 8px;
