@@ -539,21 +539,34 @@
   }
 }
 
+/* Copy button styles */
 .copy-button {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 10;
-  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 4px;
   padding: 4px 12px;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
   min-width: 44px;
-  min-height: 32px;
-  opacity: 0.7;
+  text-align: center;
 }
 
-.copy-button:hover,
-.copy-button:focus {
+/* Show copy button on message hover/press */
+.message-content:hover .copy-button,
+.message-content:active .copy-button {
   opacity: 1;
+}
+
+/* Mobile touch handling */
+@media (hover: none) {
+  .message-content:active .copy-button {
+    opacity: 1;
+  }
 }

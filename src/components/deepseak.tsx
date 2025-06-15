@@ -67,11 +67,14 @@ const detectTaskType = (message: string): 'coding' | 'research' | 'general' => {
 const getModelForTask = (taskType: 'coding' | 'research' | 'general'): string => {
   switch (taskType) {
     case 'coding':
+      // Deepseek is better for code generation and technical tasks
       return "deepseek/deepseek-r1-0528:free";
     case 'research':
+      // Llama 4 Maverick is better for research and analytical tasks
       return "meta-llama/llama-4-maverick:free";
     default:
-      return "meta-llama/llama-4-maverick:free";
+      // Mistral is good for general conversation and balanced responses
+      return "mistralai/mistral-7b-instruct:free";
   }
 };
 
@@ -91,6 +94,16 @@ const Deepseek = () => {
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Add welcome message on component mount
+  useEffect(() => {
+    const welcomeMessage = {
+      sender: 'bot' as const,
+      content: `👋 Please use English for the best results. I can help you with simple coding, research, and general questions!`,
+      model: "mistralai/mistral-7b-instruct:free"
+    };
+    setMessages([welcomeMessage]);
+  }, []);
 
   useEffect(() => {
     if (chatAreaRef.current) {
@@ -137,14 +150,17 @@ const Deepseek = () => {
               "role": "system",
               "content": taskType === 'coding' 
                 ? "You are a helpful programming assistant. Provide clear, well-documented code examples with explanations."
+                : taskType === 'research'
+                ? "You are a research assistant. Provide detailed, well-researched responses with citations and explanations."
                 : "You are a helpful assistant. Provide clear and concise responses."
             },
             { "role": "user", "content": userMessage }
           ],
-          "temperature": taskType === 'coding' ? 0.3 : 0.7, // Lower temperature for more precise code
-          "max_tokens": taskType === 'coding' ? 1000 : 500, // More tokens for code responses
+          "temperature": taskType === 'coding' ? 0.3 : taskType === 'research' ? 0.5 : 0.7,
+          "max_tokens": taskType === 'coding' ? 1000 : taskType === 'research' ? 800 : 500,
           "presence_penalty": 0.1,
-          "frequency_penalty": 0.1
+          "frequency_penalty": 0.1,
+          "top_p": 0.95
         })
       });
 
