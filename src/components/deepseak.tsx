@@ -5,20 +5,92 @@ import './deepseak.css';
 interface Message {
   sender: 'user' | 'bot';
   content: string;
+  model?: string;
 } 
 
+const markdownCache = new Map<string, string>();
+
 function markdownToPlainText(markdown: string): string {
+  if (markdownCache.has(markdown)) {
+    return markdownCache.get(markdown)!;
+  }
+
   const html = marked.parse(markdown, { async: false });
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
-  return tempDiv.textContent || tempDiv.innerText || '';
+  const result = tempDiv.textContent || tempDiv.innerText || '';
+  
+  markdownCache.set(markdown, result);
+  return result;
 }
+
+const codingKeywords = new Set([
+  'code', 'function', 'class', 'variable', 'loop', 'array', 'object',
+  'method', 'api', 'database', 'server', 'client', 'frontend', 'backend',
+  'algorithm', 'debug', 'error', 'exception', 'compile', 'runtime',
+  'javascript', 'python', 'java', 'typescript', 'react', 'node',
+  'write', 'create', 'implement', 'develop', 'program', 'script',
+  'def', 'import', 'print', 'return', 'if', 'else', 'for', 'while'
+]);
+
+const researchKeywords = new Set([
+  'research', 'study', 'analysis', 'investigate', 'explore', 'examine',
+  'compare', 'contrast', 'evaluate', 'assess', 'review', 'literature',
+  'methodology', 'findings', 'conclusion', 'hypothesis', 'theory',
+  'data', 'statistics', 'survey', 'experiment', 'observation'
+]);
+
+const detectTaskType = (message: string): 'coding' | 'research' | 'general' => {
+  const words = message.toLowerCase().split(/\s+/);
+  let codingScore = 0;
+  let researchScore = 0;
+
+  // Check for explicit coding requests
+  if (message.toLowerCase().includes('write code') || 
+      message.toLowerCase().includes('create code') ||
+      message.toLowerCase().includes('implement') ||
+      message.toLowerCase().includes('program')) {
+    return 'coding';
+  }
+
+  // Single pass through words
+  for (const word of words) {
+    if (codingKeywords.has(word)) codingScore++;
+    if (researchKeywords.has(word)) researchScore++;
+  }
+
+  if (codingScore > researchScore) return 'coding';
+  if (researchScore > codingScore) return 'research';
+  return 'general';
+};
+
+const getModelForTask = (taskType: 'coding' | 'research' | 'general'): string => {
+  switch (taskType) {
+    case 'coding':
+      return "deepseek/deepseek-r1-0528:free";
+    case 'research':
+      return "meta-llama/llama-4-maverick:free";
+    default:
+      return "meta-llama/llama-4-maverick:free";
+  }
+};
+
+const modelDisplayNames = new Map([
+  ["deepseek/deepseek-r1-0528:free", "Deepseek"],
+  ["meta-llama/llama-4-maverick:free", "Llama 4 Maverick"],
+  ["mistralai/mistral-7b-instruct:free", "Mistral"]
+]);
+
+const getModelDisplayName = (modelId: string): string => {
+  return modelDisplayNames.get(modelId) || modelId;
+};
 
 const Deepseek = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (chatAreaRef.current) {
@@ -37,12 +109,19 @@ const Deepseek = () => {
   };
 
   async function sendMessage() {
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
+    
     const userMessage = input;
-    setMessages((msgs) => [...msgs, { sender: 'user', content: userMessage }]);
     setInput('');
-    setMessages((msgs) => [...msgs, { sender: 'bot', content: 'Thinking...' }]);
+    setIsLoading(true);
+    
+    setMessages(msgs => [...msgs, { sender: 'user', content: userMessage }]);
+    setMessages(msgs => [...msgs, { sender: 'bot', content: 'Thinking...' }]);
+    
     try {
+      const taskType = detectTaskType(userMessage);
+      const selectedModel = getModelForTask(taskType);
+      
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -52,21 +131,49 @@ const Deepseek = () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          "model": "deepseek/deepseek-r1-0528:free",
-          "messages": [{ "role": "user", "content": userMessage }]
+          "model": selectedModel,
+          "messages": [
+            {
+              "role": "system",
+              "content": taskType === 'coding' 
+                ? "You are a helpful programming assistant. Provide clear, well-documented code examples with explanations."
+                : "You are a helpful assistant. Provide clear and concise responses."
+            },
+            { "role": "user", "content": userMessage }
+          ],
+          "temperature": taskType === 'coding' ? 0.3 : 0.7, // Lower temperature for more precise code
+          "max_tokens": taskType === 'coding' ? 1000 : 500, // More tokens for code responses
+          "presence_penalty": 0.1,
+          "frequency_penalty": 0.1
         })
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
       const markdownText = data.choices[0]?.message?.content || 'No response from the model';
-      setMessages((msgs) => [
-        ...msgs.slice(0, -1), // Remove 'Thinking...'
-        { sender: 'bot', content: markdownText }
+      
+      setMessages(msgs => [
+        ...msgs.slice(0, -1),
+        { 
+          sender: 'bot', 
+          content: markdownText,
+          model: selectedModel
+        }
       ]);
     } catch (error: any) {
-      setMessages((msgs) => [
+      console.error('Error details:', error);
+      setMessages(msgs => [
         ...msgs.slice(0, -1),
-        { sender: 'bot', content: 'Error: ' + error.message }
+        { 
+          sender: 'bot', 
+          content: `Error: ${error.message}. Please try rephrasing your request or try again later.`
+        }
       ]);
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -85,6 +192,15 @@ const Deepseek = () => {
               {msg.sender === 'bot' ? (
                 <>
                   <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content, { async: false }) }} />
+                  <div style={{ 
+                    fontSize: '0.8em', 
+                    color: '#666', 
+                    marginTop: '8px', 
+                    fontStyle: 'italic',
+                    textAlign: 'right'
+                  }}>
+                    Powered by {getModelDisplayName(msg.model || "deepseek/deepseek-r1-0528:free")}
+                  </div>
                   <button
                     className="copy-button"
                     onClick={() => copyToClipboard(markdownToPlainText(msg.content), idx)}

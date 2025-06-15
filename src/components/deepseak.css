@@ -31,13 +31,14 @@
   scroll-behavior: smooth;
   /* Better mobile scrolling */
   -webkit-overflow-scrolling: touch;
-  /* Custom scrollbar styling */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0,0,0,0.2) transparent;
+  /* Hide scrollbar but keep functionality */
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
 }
 
+/* Hide scrollbar for Chrome, Safari and Opera */
 .chat-area::-webkit-scrollbar {
-  width: 4px;
+  display: none;
 }
 
 .chat-area::-webkit-scrollbar-track {
@@ -148,6 +149,14 @@
   border: 1px solid #e9ecef;
   border-bottom-left-radius: 4px;
   box-sizing: border-box;
+  /* Hide scrollbar but keep functionality */
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.message.bot .message-content::-webkit-scrollbar {
+  display: none;
 }
 
 /* Bot message bubble tail */
@@ -178,21 +187,6 @@
   z-index: 1;
 }
 
-.message.bot .message-content::-webkit-scrollbar {
-  height: 4px;
-}
-
-.message.bot .message-content::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 2px;
-}
-
-.message.bot .message-content::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.2);
-  border-radius: 2px;
-}
-
-/* Handle code blocks and preformatted content */
 .message.bot .message-content pre,
 .message.bot .message-content code {
   display: block;
@@ -200,6 +194,9 @@
   white-space: pre;
   max-width: 100%;
   box-sizing: border-box;
+  /* Hide scrollbar but keep functionality */
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
 }
 
 .message.bot .message-content pre {
@@ -214,28 +211,14 @@
   overflow-wrap: normal;
   max-width: 100%;
   box-sizing: border-box;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0,0,0,0.3) transparent;
-  /* Better mobile scrolling */
-  -webkit-overflow-scrolling: touch;
+  /* Hide scrollbar but keep functionality */
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
 }
 
+/* Hide scrollbar for Chrome, Safari and Opera */
 .message.bot .message-content pre::-webkit-scrollbar {
-  height: 6px;
-}
-
-.message.bot .message-content pre::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 3px;
-}
-
-.message.bot .message-content pre::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.3);
-  border-radius: 3px;
-}
-
-.message.bot .message-content pre::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,0,0,0.4);
+  display: none;
 }
 
 /* Tables in bot messages */
