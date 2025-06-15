@@ -145,7 +145,7 @@ const Deepseek = () => {
                     fontStyle: 'italic',
                     textAlign: 'right'
                   }}>
-                    Powered by {getModelDisplayName(msg.model || "...")}
+                    {/* Powered by {getModelDisplayName(msg.model || "...")} */}
                   </div>
                   <button
                     className="copy-button"
