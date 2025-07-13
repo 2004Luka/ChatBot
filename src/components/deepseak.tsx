@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { marked } from 'marked';
 import './deepseak.css';
+import { FiMenu, FiSun, FiMoon, FiSettings, FiSend, FiPlus, FiX } from 'react-icons/fi';
 import type { Message, Conversation, ChatSettings } from '../types/chat';
 import { 
   markdownToPlainText, 
@@ -323,7 +324,7 @@ const Deepseek = () => {
           onClick={toggleSidebar}
           aria-label="Toggle sidebar"
         >
-          ☰
+          <FiMenu size={24} color={settings.theme === 'dark' ? '#fff' : undefined} />
         </button>
         <h1 className="app-title">AI Chat Assistant</h1>
         <div className="header-actions">
@@ -332,14 +333,16 @@ const Deepseek = () => {
             onClick={toggleTheme}
             aria-label="Toggle theme"
           >
-            {settings.theme === 'light' ? '🌙' : '☀️'}
+            {settings.theme === 'light' 
+              ? <FiMoon size={22} color={undefined} /> 
+              : <FiSun size={22} color="#fff" />}
           </button>
           <button 
             className="settings-toggle"
             onClick={toggleSettings}
             aria-label="Settings"
           >
-            ⚙️
+            <FiSettings size={22} color={settings.theme === 'dark' ? '#fff' : undefined} />
           </button>
         </div>
       </div>
@@ -353,12 +356,21 @@ const Deepseek = () => {
       {showSidebar && (
         <div className="sidebar open" ref={sidebarRef}>
           <div className="sidebar-header">
-            <h3>Conversations</h3>
+            <div className="sidebar-header-top">
+              <h3>Conversations</h3>
+              <button 
+                className="close-button"
+                onClick={() => setShowSidebar(false)}
+                aria-label="Close sidebar"
+              >
+                ×
+              </button>
+            </div>
             <button 
               className="new-chat-btn"
               onClick={startNewConversation}
             >
-              + New Chat
+              <FiPlus size={20} color={settings.theme === 'dark' ? '#fff' : undefined} /> New Chat
             </button>
           </div>
           <div className="conversations-list">
@@ -388,7 +400,16 @@ const Deepseek = () => {
       {/* Settings Panel */}
       {showSettings && (
         <div className="settings-panel open" ref={settingsRef}>
-          <h3>Settings</h3>
+          <div className="settings-header">
+            <h3>Settings</h3>
+            <button 
+              className="close-button"
+              onClick={() => setShowSettings(false)}
+              aria-label="Close settings"
+            >
+              ×
+            </button>
+          </div>
           <div className="settings-content">
             <div className="setting-item">
               <label>
@@ -473,7 +494,7 @@ const Deepseek = () => {
             {isLoading ? (
               <span className="input-spinner"></span>
             ) : (
-              '➤'
+              <FiSend size={22} color="#fff" />
             )}
           </button>
         </div>
