@@ -1,5 +1,5 @@
 import { marked } from 'marked';
-import type { Message, Conversation, ChatSettings } from '../types/chat';
+import type {Conversation, ChatSettings } from '../types/chat';
 
 const markdownCache = new Map<string, string>();
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { marked } from 'marked';
 import './deepseak.css';
-import { FiMenu, FiSun, FiMoon, FiSettings, FiSend, FiPlus, FiX } from 'react-icons/fi';
+import { FiMenu, FiSun, FiMoon, FiSettings, FiSend, FiPlus} from 'react-icons/fi';
 import type { Message, Conversation, ChatSettings } from '../types/chat';
 import { 
   markdownToPlainText, 
