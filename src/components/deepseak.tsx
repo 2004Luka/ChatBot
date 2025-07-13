@@ -391,7 +391,7 @@ const Deepseek = () => {
           </div>
         </div>
       )}
-
+ 
       {/* Backdrop for settings */}
       {showSettings && (
         <div className="backdrop" onClick={() => setShowSettings(false)} />
