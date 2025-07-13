@@ -473,6 +473,20 @@ const Deepseek = () => {
               </div>
             </div>
           ))}
+          
+          {/* Typing indicator when bot is responding */}
+          {isLoading && (
+            <div className="message bot">
+              <div className="message-content">
+                <div className="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div className="typing-text">AI is thinking...</div>
+              </div>
+            </div>
+          )}
         </div>
         
         <div className="input-area">
