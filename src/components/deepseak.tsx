@@ -7,7 +7,6 @@ import {
   markdownToPlainText, 
   detectTaskType, 
   getModelForTask, 
-  getModelDisplayName, 
   retryWithBackoff,
   generateConversationId,
   generateMessageId,
