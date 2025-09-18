@@ -31,6 +31,8 @@ const Deepseek = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [showNotification, setShowNotification] = useState(false);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +50,21 @@ const Deepseek = () => {
     } else {
       startNewConversation();
     }
+
+    // Show notification after a delay
+    const notificationTimer = setTimeout(() => {
+      setShowNotification(true);
+    }, 1500);
+
+    // Hide first load animations after they complete
+    const animationTimer = setTimeout(() => {
+      setIsFirstLoad(false);
+    }, 1200);
+
+    return () => {
+      clearTimeout(notificationTimer);
+      clearTimeout(animationTimer);
+    };
   }, []);
 
   // Auto-scroll to bottom
@@ -306,6 +323,10 @@ const Deepseek = () => {
     }));
   };
 
+  const closeNotification = () => {
+    setShowNotification(false);
+  };
+
   const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
   };
@@ -315,9 +336,27 @@ const Deepseek = () => {
   };
 
   return (
-    <div className={`container ${settings.theme}`}>
+    <div className={`container ${settings.theme} ${isFirstLoad ? 'first-load' : ''}`}>
+      {/* Notification Popup */}
+      {showNotification && (
+        <div className={`notification-popup ${showNotification ? 'show' : ''}`}>
+          <div className="notification-content">
+            <div className="notification-text">
+              💬 Please write your messages in English for the best experience!
+            </div>
+            <button 
+              className="notification-close" 
+              onClick={closeNotification}
+              aria-label="Close notification"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
-      <div className="header">
+      <div className={`header ${isFirstLoad ? 'first-load-header' : ''}`}>
         <button 
           className="sidebar-toggle"
           onClick={toggleSidebar}
@@ -353,7 +392,7 @@ const Deepseek = () => {
 
       {/* Sidebar */}
       {showSidebar && (
-        <div className="sidebar open" ref={sidebarRef}>
+        <div className={`sidebar open ${isFirstLoad ? 'first-load-sidebar' : ''}`} ref={sidebarRef}>
           <div className="sidebar-header">
             <div className="sidebar-header-top">
               <h3>Conversations</h3>
@@ -440,7 +479,7 @@ const Deepseek = () => {
 
       {/* Main Chat Area */}
       <div className="chat-container">
-        <div className="chat-area" ref={chatAreaRef}>
+        <div className={`chat-area ${isFirstLoad ? 'first-load-chat' : ''}`} ref={chatAreaRef}>
           {messages.map((msg, idx) => (
             <div key={msg.id || idx} className={`message ${msg.sender}`}>
               <div className="message-content">
@@ -489,7 +528,7 @@ const Deepseek = () => {
           )}
         </div>
         
-        <div className="input-area">
+        <div className={`input-area ${isFirstLoad ? 'first-load-input' : ''}`}>
           <input
             ref={inputRef}
             type="text"
