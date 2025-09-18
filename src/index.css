@@ -6,68 +6,79 @@
 
 /* CSS Custom Properties for Design System */
 :root {
-  /* Color Palette */
-  --primary-50: #f0f9ff;
-  --primary-100: #e0f2fe;
-  --primary-200: #bae6fd;
-  --primary-300: #7dd3fc;
-  --primary-400: #38bdf8;
-  --primary-500: #0ea5e9;
-  --primary-600: #0284c7;
-  --primary-700: #0369a1;
-  --primary-800: #075985;
-  --primary-900: #0c4a6e;
-  
-  --secondary-50: #fdf4ff;
-  --secondary-100: #fae8ff;
-  --secondary-200: #f5d0fe;
-  --secondary-300: #f0abfc;
-  --secondary-400: #e879f9;
-  --secondary-500: #d946ef;
-  --secondary-600: #c026d3;
-  --secondary-700: #a21caf;
-  --secondary-800: #86198f;
-  --secondary-900: #701a75;
-  
-  /* Neutral Colors */
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-  
+  /* Sunset Neon — bold warm coral + amber with high contrast */
+  --primary-50: #fff0f3;
+  --primary-100: #ffd9e3;
+  --primary-200: #ffb3c9;
+  --primary-300: #ff8ab0;
+  --primary-400: #ff5c98;
+  --primary-500: #ff2e88; /* core hue */
+  --primary-600: #e01073;
+  --primary-700: #b8085c;
+  --primary-800: #800642;
+  --primary-900: #3f0221;
+
+  /* Amber accent family */
+  --accent-50: #fff8e6;
+  --accent-100: #ffefcc;
+  --accent-200: #ffdf99;
+  --accent-300: #ffcf66;
+  --accent-400: #ffbe33;
+  --accent-500: #ffad00;
+  --accent-600: #d98f00;
+  --accent-700: #a86d00;
+  --accent-800: #704900;
+  --accent-900: #3a2600;
+
+  /* Warm neutrals tuned for WCAG contrast */
+  --gray-50: #fff7f9;
+  --gray-100: #ffeef2;
+  --gray-200: #ffdbe4;
+  --gray-300: #ffc2d4;
+  --gray-400: #e69ab4;
+  --gray-500: #c06f8a;
+  --gray-600: #99556d;
+  --gray-700: #6f3b4d;
+  --gray-800: #452432;
+  --gray-900: #24131b;
+
   /* Semantic Colors */
-  --success-500: #10b981;
-  --warning-500: #f59e0b;
-  --error-500: #ef4444;
-  --info-500: #3b82f6;
-  
+  --success-500: #81c784;
+  --warning-500: #ffd54f;
+  --error-500: #e57373;
+  --info-500: #64b5f6;
+
   /* Light Theme */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --text-tertiary: #94a3b8;
-  --border-primary: #e2e8f0;
-  --border-secondary: #cbd5e1;
+  --bg-primary: #fff7f9;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #ffeef2;
+  --text-primary: #2b0f19;
+  --text-secondary: #6f3b4d;
+  --text-tertiary: #99556d;
+  --border-primary: #ffdbe4;
+  --border-secondary: #ffc2d4;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  --gradient-warm: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-  --gradient-cool: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-  
+
+  /* Expressive gradient tokens */
+  --gradient-primary: linear-gradient(135deg, var(--primary-500) 0%, var(--accent-500) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-700) 100%);
+  --gradient-accent: linear-gradient(135deg, var(--accent-400) 0%, var(--primary-600) 100%);
+  --gradient-warm: linear-gradient(135deg, #ffe1e9 0%, #ffd79f 100%);
+  --gradient-cool: linear-gradient(135deg, #3f0221 0%, #a86d00 100%);
+  --gradient-button: linear-gradient(135deg, var(--primary-600) 0%, var(--accent-500) 100%);
+
+  /* Buttons */
+  --button-text: #ffffff;
+
+  /* Fancy surface + ring tokens */
+  --surface-glass: color-mix(in oklab, var(--bg-secondary) 70%, white 30%);
+  --surface-glass-dark: color-mix(in oklab, var(--bg-secondary) 70%, black 10%);
+  --ring-outer: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0));
+  --ring-inner: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0));
+
   /* Spacing */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -80,19 +91,19 @@
   --space-12: 3rem;
   --space-16: 4rem;
   --space-20: 5rem;
-  
+
   /* Border Radius */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
   --radius-full: 9999px;
-  
+
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Cascadia Code', monospace;
-  
+
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -101,14 +112,16 @@
 
 /* Dark Theme Variables */
 [data-theme="dark"] {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-tertiary: #94a3b8;
-  --border-primary: #334155;
-  --border-secondary: #475569;
+  --bg-primary: #0f0610; /* deep aubergine */
+  --bg-secondary: #150912;
+  --bg-tertiary: #1c0c18;
+  --text-primary: #fff0f3;
+  --text-secondary: #ffb3c9;
+  --text-tertiary: #ff8ab0;
+  --border-primary: #2a1622;
+  --border-secondary: #341a2a;
+  --surface-glass: color-mix(in oklab, var(--bg-secondary) 85%, white 6%);
+  --surface-glass-dark: color-mix(in oklab, var(--bg-secondary) 85%, black 10%);
 }
 
 /* Reset and Base Styles */
@@ -198,13 +211,13 @@ pre {
   font-family: var(--font-mono);
   font-size: 0.875rem;
   line-height: 1.5;
-  background: var(--gray-900);
-  color: var(--gray-100);
+  background: var(--accent-900);
+  color: var(--primary-50);
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   overflow-x: auto;
   margin: var(--space-4) 0;
-  border: 1px solid var(--gray-700);
+  border: 1px solid var(--accent-800);
 }
 
 /* Blockquote Styles */
