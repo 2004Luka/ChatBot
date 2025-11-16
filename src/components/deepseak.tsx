@@ -1,12 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { marked } from 'marked';
-import './deepseak.css';
-import { FiMenu, FiSun, FiMoon, FiSettings, FiSend, FiPlus} from 'react-icons/fi';
+import { useState, useRef, useEffect } from 'react';
 import type { Message, Conversation, ChatSettings } from '../types/chat';
-import { 
-  markdownToPlainText, 
-  detectTaskType, 
-  getModelForTask, 
+import {
+  detectTaskType,
+  getModelForTask,
   retryWithBackoff,
   generateConversationId,
   generateMessageId,
@@ -15,11 +11,17 @@ import {
   deleteConversation,
   getChatSettings,
   saveChatSettings,
-  formatTimestamp,
   generateConversationTitle,
   exportConversation,
-  copyToClipboard
+  copyToClipboard,
 } from '../utils/chatUtils';
+import { Header } from './Header';
+import { MessageList } from './MessageList';
+import { InputBar } from './InputBar';
+import { Sidebar } from './Sidebar';
+import { SettingsPanel } from './SettingsPanel';
+import { NotificationBanner } from './NotificationBanner';
+import './deepseak.css';
 
 const Deepseek = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,18 +34,16 @@ const Deepseek = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [showNotification, setShowNotification] = useState(false);
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
-  
+
   const chatAreaRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const settingsRef = useRef<HTMLDivElement>(null);
+  const lastRequestTime = useRef<number>(0);
+  const REQUEST_COOLDOWN = 2000; // 2 seconds between requests to respect rate limits
 
   // Load conversations on mount
   useEffect(() => {
     const savedConversations = getConversations();
     setConversations(savedConversations);
-    
+
     if (savedConversations.length > 0) {
       setCurrentConversation(savedConversations[0]);
       setMessages(savedConversations[0].messages);
@@ -56,14 +56,8 @@ const Deepseek = () => {
       setShowNotification(true);
     }, 1500);
 
-    // Hide first load animations after they complete
-    const animationTimer = setTimeout(() => {
-      setIsFirstLoad(false);
-    }, 1200);
-
     return () => {
       clearTimeout(notificationTimer);
-      clearTimeout(animationTimer);
     };
   }, []);
 
@@ -83,32 +77,6 @@ const Deepseek = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme);
   }, [settings.theme]);
-
-  // Handle click outside to close panels
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      
-      // Close sidebar if clicking outside
-      if (showSidebar && sidebarRef.current && !sidebarRef.current.contains(target)) {
-        setShowSidebar(false);
-      }
-      
-      // Close settings if clicking outside
-      if (showSettings && settingsRef.current && !settingsRef.current.contains(target)) {
-        setShowSettings(false);
-      }
-    };
-
-    // Add event listener if any panel is open
-    if (showSidebar || showSettings) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showSidebar, showSettings]);
 
   // Handle escape key to close panels
   useEffect(() => {
@@ -131,12 +99,12 @@ const Deepseek = () => {
       title: 'New Conversation',
       messages: [],
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    
+
     setCurrentConversation(newConversation);
     setMessages([]);
-    setConversations(prev => [newConversation, ...prev]);
+    setConversations((prev) => [newConversation, ...prev]);
   };
 
   const loadConversation = (conversation: Conversation) => {
@@ -145,20 +113,33 @@ const Deepseek = () => {
     setShowSidebar(false);
   };
 
+  const deleteConversationById = (conversationId: string) => {
+    deleteConversation(conversationId);
+    setConversations((prev) => {
+      const filtered = prev.filter((c) => c.id !== conversationId);
+      
+      // If the deleted conversation was the current one, load another or start new
+      if (currentConversation?.id === conversationId) {
+        if (filtered.length > 0) {
+          // Use setTimeout to ensure state update happens after this one
+          setTimeout(() => {
+            loadConversation(filtered[0]);
+          }, 0);
+        } else {
+          setTimeout(() => {
+            startNewConversation();
+          }, 0);
+        }
+      }
+      
+      return filtered;
+    });
+  };
+
   const deleteCurrentConversation = () => {
     if (!currentConversation) return;
-    
-    deleteConversation(currentConversation.id);
-    setConversations(prev => prev.filter(c => c.id !== currentConversation.id));
-    
-    if (conversations.length > 1) {
-      const nextConversation = conversations.find(c => c.id !== currentConversation.id);
-      if (nextConversation) {
-        loadConversation(nextConversation);
-      }
-    } else {
-      startNewConversation();
-    }
+    deleteConversationById(currentConversation.id);
+    setShowSettings(false);
   };
 
   const handleCopyMessage = async (text: string, idx: number) => {
@@ -171,13 +152,13 @@ const Deepseek = () => {
 
   const exportCurrentConversation = () => {
     if (!currentConversation) return;
-    
+
     const updatedConversation = {
       ...currentConversation,
       messages,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    
+
     const dataStr = exportConversation(updatedConversation);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
@@ -190,55 +171,124 @@ const Deepseek = () => {
 
   async function sendMessage() {
     if (!input.trim() || isLoading) return;
-    
+
+    // Throttle requests to prevent rate limit issues (2 seconds between requests)
+    const now = Date.now();
+    if (now - lastRequestTime.current < REQUEST_COOLDOWN) {
+      const waitTime = Math.ceil((REQUEST_COOLDOWN - (now - lastRequestTime.current)) / 1000);
+      alert(`Please wait ${waitTime} second(s) before sending another message to avoid rate limits.`);
+      return;
+    }
+    lastRequestTime.current = now;
+
     const userMessage: Message = {
       id: generateMessageId(),
       sender: 'user',
       content: input.trim(),
       timestamp: new Date(),
-      status: 'sending'
+      status: 'sending',
     };
-    
+
     setInput('');
     setIsLoading(true);
-    setMessages(msgs => [...msgs, userMessage]);
+    setMessages((msgs) => [...msgs, userMessage]);
 
     try {
       const taskType = detectTaskType(userMessage.content);
       const selectedModel = getModelForTask(taskType);
-      
+      const apiKey = import.meta.env.VITE_API_KEY;
+
+      if (!apiKey) {
+        throw new Error('API key is not set. Please add VITE_API_KEY to your .env file');
+      }
+
+      // Build system instruction based on task type
+      const systemInstruction =
+        taskType === 'coding'
+          ? 'You are a helpful programming assistant. Provide clear, well-documented code examples with explanations.'
+          : taskType === 'research'
+          ? 'You are a research assistant. Provide detailed, well-researched responses with citations and explanations.'
+          : 'You are a helpful assistant. Provide clear and concise responses.';
+
+      // Get conversation history for context (limit to last 5 message pairs to avoid rate limits)
+      const recentMessages = messages.slice(-10);
+      const conversationHistory = recentMessages
+        .filter((msg) => msg.content && msg.content.trim().length > 0)
+        .map((msg) => ({
+          role: msg.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.content }],
+        }));
+
       const makeRequest = async () => {
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${import.meta.env.VITE_API_KEY}`,
-            "HTTP-Referer": "<YOUR_SITE_URL>",
-            "X-Title": "<YOUR_SITE_NAME>",
-            "Content-Type": "application/json"
+        // Gemini API endpoint
+        // v1 API supports newer models like gemini-2.5-flash and gemini-2.5-pro
+        // v1beta supports older models like gemini-1.5-flash and gemini-pro
+        // Try v1 first for newer models, fallback to v1beta for older models
+        const useV1Beta = selectedModel.includes('1.5') || selectedModel === 'gemini-pro' || selectedModel === 'gemini-pro-vision';
+        const apiVersion = useV1Beta ? 'v1beta' : 'v1';
+        const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${selectedModel}:generateContent?key=${apiKey}`;
+
+        // Build request payload for Gemini API
+        const requestBody: any = {
+          contents: [
+            ...conversationHistory,
+            {
+              role: 'user',
+              parts: [{ text: userMessage.content }],
+            },
+          ],
+          generationConfig: {
+            temperature: taskType === 'coding' ? 0.3 : taskType === 'research' ? 0.5 : 0.7,
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: taskType === 'coding' ? 2048 : taskType === 'research' ? 1536 : 1024,
           },
-          body: JSON.stringify({
-            "model": selectedModel,
-            "messages": [
+        };
+
+        // Add system instruction (format differs by API version)
+        if (systemInstruction) {
+          if (apiVersion === 'v1beta') {
+            // v1beta supports systemInstruction field at root level
+            requestBody.systemInstruction = {
+              parts: [{ text: systemInstruction }],
+            };
+          } else {
+            // v1 API: prepend system instruction as first message in contents
+            requestBody.contents = [
               {
-                "role": "system",
-                "content": taskType === 'coding' 
-                  ? "You are a helpful programming assistant. Provide clear, well-documented code examples with explanations."
-                  : taskType === 'research'
-                  ? "You are a research assistant. Provide detailed, well-researched responses with citations and explanations."
-                  : "You are a helpful assistant. Provide clear and concise responses."
+                role: 'user',
+                parts: [{ text: systemInstruction }],
               },
-              { "role": "user", "content": userMessage.content }
-            ],
-            "temperature": taskType === 'coding' ? 0.3 : taskType === 'research' ? 0.5 : 0.7,
-            "max_tokens": taskType === 'coding' ? 1000 : taskType === 'research' ? 800 : 500,
-            "presence_penalty": 0.1,
-            "frequency_penalty": 0.1,
-            "top_p": 0.95
-          })
+              ...requestBody.contents,
+            ];
+          }
+        }
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
-          const error = new Error(`HTTP error! status: ${response.status}`);
+          let errorMessage = `HTTP error! status: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error?.message || errorData.error?.details?.[0]?.message || errorMessage;
+            // Handle common Gemini API errors
+            if (response.status === 400) {
+              errorMessage = errorMessage || 'Invalid request. Please check your API key and request format.';
+            } else if (response.status === 429) {
+              errorMessage = 'Rate limit exceeded. Please wait a moment before trying again.';
+            } else if (response.status === 401) {
+              errorMessage = 'Invalid API key. Please check your VITE_API_KEY in .env file.';
+            }
+          } catch {
+            // If parsing fails, use default message
+          }
+          const error = new Error(errorMessage);
           (error as any).status = response.status;
           throw error;
         }
@@ -246,313 +296,149 @@ const Deepseek = () => {
         return response;
       };
 
-      const response = await retryWithBackoff(makeRequest);
+      const response = await retryWithBackoff(makeRequest, 2, 5000); // Max 2 retries, 5s initial delay
       const data = await response.json();
-      const markdownText = data.choices[0]?.message?.content || 'No response from the model';
       
+      // Check for errors in Gemini response
+      if (data.error) {
+        throw new Error(data.error.message || 'Error from Gemini API');
+      }
+      
+      // Extract text from Gemini response format
+      const candidate = data.candidates?.[0];
+      if (!candidate || !candidate.content) {
+        throw new Error('No response from Gemini API');
+      }
+      
+      const markdownText = candidate.content.parts?.[0]?.text || 'No response from the model';
+      
+      // Check for finish reason (safety filters, etc.)
+      if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+        console.warn('Gemini finish reason:', candidate.finishReason);
+      }
+
       const updatedBotMessage: Message = {
         id: generateMessageId(),
         sender: 'bot',
         content: markdownText,
         model: selectedModel,
         timestamp: new Date(),
-        status: 'sent'
+        status: 'sent',
       };
-      
-      setMessages(msgs => [
-        ...msgs,
-        updatedBotMessage
-      ]);
-      
+
+      setMessages((msgs) => [...msgs, updatedBotMessage]);
+
       // Update conversation
       if (currentConversation) {
         const updatedConversation = {
           ...currentConversation,
-          title: currentConversation.messages.length === 0 
-            ? generateConversationTitle(userMessage.content)
-            : currentConversation.title,
+          title:
+            currentConversation.messages.length === 0
+              ? generateConversationTitle(userMessage.content)
+              : currentConversation.title,
           messages: [...messages, userMessage, updatedBotMessage],
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
-        
+
         setCurrentConversation(updatedConversation);
         saveConversation(updatedConversation);
-        setConversations(prev => 
-          prev.map(c => c.id === updatedConversation.id ? updatedConversation : c)
+        setConversations((prev) =>
+          prev.map((c) => (c.id === updatedConversation.id ? updatedConversation : c))
         );
       }
-      
     } catch (error: any) {
       console.error('Error details:', error);
       let errorMessage = 'An error occurred. Please try again later.';
-      
+
       if (error.status === 429) {
-        errorMessage = 'Rate limit exceeded. Please wait a moment before trying again.';
-      } else if (error.message.includes('API key')) {
-        errorMessage = 'API key error. Please check your configuration.';
+        errorMessage = 'Rate limit exceeded. Gemini free tier allows 15 requests per minute. Please wait 60 seconds before trying again.';
+      } else if (error.status === 401) {
+        errorMessage = 'Invalid API key. Please check your VITE_API_KEY in .env file and restart the server.';
+      } else if (error.status === 400) {
+        errorMessage = error.message || 'Invalid request. Please check your API key and request format.';
+      } else if (error.message && error.message.includes('API key')) {
+        errorMessage = 'API key error. Please check your .env file and restart the server.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
-      
+
       const errorBotMessage: Message = {
         id: generateMessageId(),
         sender: 'bot',
         content: errorMessage,
         timestamp: new Date(),
-        status: 'error'
+        status: 'error',
       };
-      
-      setMessages(msgs => [
-        ...msgs,
-        errorBotMessage
-      ]);
+
+      setMessages((msgs) => [...msgs, errorBotMessage]);
     } finally {
       setIsLoading(false);
     }
   }
 
-  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  }
-
   const toggleTheme = () => {
-    setSettings(prev => ({
+    setSettings((prev) => ({
       ...prev,
-      theme: prev.theme === 'light' ? 'dark' : 'light'
+      theme: prev.theme === 'light' ? 'dark' : 'light',
     }));
   };
 
-  const closeNotification = () => {
-    setShowNotification(false);
-  };
-
-  const toggleSidebar = () => {
-    setShowSidebar(!showSidebar);
-  };
-
-  const toggleSettings = () => {
-    setShowSettings(!showSettings);
-  };
-
   return (
-    <div className={`container ${settings.theme} ${isFirstLoad ? 'first-load' : ''}`}>
-      {/* Notification Popup */}
-      {showNotification && (
-        <div className={`notification-popup ${showNotification ? 'show' : ''}`}>
-          <div className="notification-content">
-            <div className="notification-text">
-              💬 Please write your messages in English for the best experience!
-            </div>
-            <button 
-              className="notification-close" 
-              onClick={closeNotification}
-              aria-label="Close notification"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-      
-      {/* Header */}
-      <div className={`header ${isFirstLoad ? 'first-load-header' : ''}`}>
-        <button 
-          className="sidebar-toggle"
-          onClick={toggleSidebar}
-          aria-label="Toggle sidebar"
-        >
-          <FiMenu size={24} color={settings.theme === 'dark' ? '#fff' : undefined} />
-        </button>
-        <h1 className="app-title">AI Chat Assistant</h1>
-        <div className="header-actions">
-          <button 
-            className="theme-toggle"
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-          >
-            {settings.theme === 'light' 
-              ? <FiMoon size={22} color={undefined} /> 
-              : <FiSun size={22} color="#fff" />}
-          </button>
-          <button 
-            className="settings-toggle"
-            onClick={toggleSettings}
-            aria-label="Settings"
-          >
-            <FiSettings size={22} color={settings.theme === 'dark' ? '#fff' : undefined} />
-          </button>
-        </div>
-      </div>
+    <div className="chat-app-container">
+      <NotificationBanner
+        isVisible={showNotification}
+        onClose={() => setShowNotification(false)}
+        autoHideDelay={5000}
+      />
 
-      {/* Backdrop for sidebar */}
-      {showSidebar && (
-        <div className="backdrop" onClick={() => setShowSidebar(false)} />
-      )}
+      <Header
+        settings={settings}
+        onToggleSidebar={() => setShowSidebar(!showSidebar)}
+        onToggleTheme={toggleTheme}
+        onToggleSettings={() => setShowSettings(!showSettings)}
+      />
 
-      {/* Sidebar */}
-      {showSidebar && (
-        <div className={`sidebar open ${isFirstLoad ? 'first-load-sidebar' : ''}`} ref={sidebarRef}>
-          <div className="sidebar-header">
-            <div className="sidebar-header-top">
-              <h3>Conversations</h3>
-              <button 
-                className="close-button"
-                onClick={() => setShowSidebar(false)}
-                aria-label="Close sidebar"
-              >
-                ×
-              </button>
-            </div>
-            <button 
-              className="new-chat-btn"
-              onClick={startNewConversation}
-            >
-              <FiPlus size={20} color={settings.theme === 'dark' ? '#fff' : undefined} /> New Chat
-            </button>
-          </div>
-          <div className="conversations-list">
-            {conversations.map(conv => (
-              <div 
-                key={conv.id}
-                className={`conversation-item ${currentConversation?.id === conv.id ? 'active' : ''}`}
-                onClick={() => loadConversation(conv)}
-              >
-                <div className="conversation-content">
-                  <div className="conversation-title">{conv.title}</div>
-                  <div className="conversation-date">
-                    {formatTimestamp(conv.updatedAt)}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
- 
-      {/* Backdrop for settings */}
-      {showSettings && (
-        <div className="backdrop" onClick={() => setShowSettings(false)} />
-      )}
+      <Sidebar
+        isOpen={showSidebar}
+        conversations={conversations}
+        currentConversationId={currentConversation?.id || null}
+        onClose={() => setShowSidebar(false)}
+        onNewConversation={startNewConversation}
+        onSelectConversation={loadConversation}
+        onDeleteConversation={deleteConversationById}
+      />
 
-      {/* Settings Panel */}
-      {showSettings && (
-        <div className="settings-panel open" ref={settingsRef}>
-          <div className="settings-header">
-            <h3>Settings</h3>
-            <button 
-              className="close-button"
-              onClick={() => setShowSettings(false)}
-              aria-label="Close settings"
-            >
-              ×
-            </button>
-          </div>
-          <div className="settings-content">
-            <div className="setting-item">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={settings.autoScroll}
-                  onChange={(e) => setSettings(prev => ({ ...prev, autoScroll: e.target.checked }))}
-                />
-                Auto-scroll to bottom
-              </label>
-            </div>
-            <div className="setting-item">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={settings.showTimestamps}
-                  onChange={(e) => setSettings(prev => ({ ...prev, showTimestamps: e.target.checked }))}
-                />
-                Show timestamps
-              </label>
-            </div>
-            <div className="setting-actions">
-              <button onClick={exportCurrentConversation}>Export Chat</button>
-              <button onClick={deleteCurrentConversation} className="danger">Delete Chat</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SettingsPanel
+        isOpen={showSettings}
+        settings={settings}
+        onClose={() => setShowSettings(false)}
+        onSettingsChange={setSettings}
+        onExport={exportCurrentConversation}
+        onDelete={deleteCurrentConversation}
+      />
 
-      {/* Main Chat Area */}
-      <div className="chat-container">
-        <div className={`chat-area ${isFirstLoad ? 'first-load-chat' : ''}`} ref={chatAreaRef}>
-          {messages.map((msg, idx) => (
-            <div key={msg.id || idx} className={`message ${msg.sender}`}>
-              <div className="message-content">
-                {msg.sender === 'bot' ? (
-                  <>
-                    <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content, { async: false }) }} />
-                    {settings.showTimestamps && msg.timestamp && (
-                      <div className="message-timestamp">
-                        {formatTimestamp(msg.timestamp)}
-                      </div>
-                    )}
-                    <button
-                      className="copy-button"
-                      onClick={() => handleCopyMessage(markdownToPlainText(msg.content), idx)}
-                      title="Copy to clipboard"
-                    >
-                      {copiedIdx === idx ? 'Copied!' : 'Copy'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="user-message-text">{msg.content}</div>
-                    {settings.showTimestamps && msg.timestamp && (
-                      <div className="message-timestamp">
-                        {formatTimestamp(msg.timestamp)}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-          
-          {/* Typing indicator when bot is responding */}
-          {isLoading && (
-            <div className="message bot">
-              <div className="message-content">
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <div className="typing-text">AI is thinking...</div>
-              </div>
-            </div>
-          )}
+      <div className="chat-main-container">
+        <div className="chat-area-wrapper">
+          <div className="chat-area" ref={chatAreaRef}>
+            <MessageList
+              messages={messages}
+              showTimestamps={settings.showTimestamps}
+              copiedIndex={copiedIdx}
+              isLoading={isLoading}
+              onCopy={handleCopyMessage}
+            />
+          </div>
         </div>
-        
-        <div className={`input-area ${isFirstLoad ? 'first-load-input' : ''}`}>
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Type your message..."
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleInputKeyDown}
-            disabled={isLoading}
-          />
-          <button 
-            onClick={sendMessage}
-            disabled={isLoading || !input.trim()}
-            className="send-button"
-          >
-            {isLoading ? (
-              <span className="input-spinner"></span>
-            ) : (
-              <FiSend size={22} color="#fff" />
-            )}
-          </button>
-        </div>
+
+        <InputBar
+          input={input}
+          isLoading={isLoading}
+          onInputChange={setInput}
+          onSend={sendMessage}
+        />
       </div>
     </div>
   );
 };
 
-export default Deepseek; 
+export default Deepseek;

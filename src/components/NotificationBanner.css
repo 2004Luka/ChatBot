@@ -1,0 +1,128 @@
+/* Notification Banner Component Styles */
+.notification-banner {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-main);
+  padding: 0.875rem 1.125rem 0.875rem 1rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(88, 180, 209, 0.2);
+  z-index: 1000;
+  max-width: 90%;
+  width: auto;
+  min-width: 320px;
+  opacity: 0;
+  transition: all var(--transition-normal);
+  backdrop-filter: blur(20px) saturate(180%);
+  overflow: hidden;
+}
+
+.notification-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+}
+
+.notification-banner.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  position: relative;
+  z-index: 1;
+}
+
+.notification-text {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.notification-text::before {
+  content: '💬';
+  font-size: 1rem;
+  opacity: 0.85;
+  flex-shrink: 0;
+  margin-right: 0.25rem;
+}
+
+.notification-close {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  opacity: 0.7;
+  position: relative;
+}
+
+.notification-close:hover {
+  opacity: 1;
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-primary);
+  color: var(--color-text-main);
+  transform: scale(1.1) rotate(90deg);
+}
+
+.notification-close:active {
+  transform: scale(0.95) rotate(90deg);
+}
+
+/* Light mode specific adjustments */
+[data-theme="light"] .notification-banner {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(88, 180, 209, 0.15);
+}
+
+[data-theme="light"] .notification-banner::before {
+  background: var(--color-primary);
+}
+
+@media (max-width: 768px) {
+  .notification-banner {
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+    max-width: none;
+    width: auto;
+    min-width: auto;
+    transform: translateY(100px);
+  }
+
+  .notification-banner.show {
+    transform: translateY(0);
+  }
+  
+  .notification-text {
+    font-size: 0.8125rem;
+  }
+}

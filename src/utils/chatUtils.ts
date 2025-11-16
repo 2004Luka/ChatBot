@@ -80,7 +80,7 @@ export const getChatSettings = (): ChatSettings => {
     const stored = localStorage.getItem('chatbot_settings');
     if (!stored) {
       return {
-        theme: 'light',
+        theme: 'dark',
         language: 'en',
         autoScroll: true,
         showTimestamps: true
@@ -90,7 +90,7 @@ export const getChatSettings = (): ChatSettings => {
   } catch (error) {
     console.error('Failed to load settings:', error);
     return {
-      theme: 'light',
+      theme: 'dark',
       language: 'en',
       autoScroll: true,
       showTimestamps: true
@@ -156,25 +156,66 @@ export const detectTaskType = (message: string): 'coding' | 'research' | 'genera
   return 'general';
 };
 
-export const getModelForTask = (taskType: 'coding' | 'research' | 'general'): string => {
-  switch (taskType) {
-    case 'coding':
-      return "deepseek/deepseek-r1-0528:free";
-    case 'research':
-      return "meta-llama/llama-4-maverick:free";
-    default:
-      return "mistralai/mistral-7b-instruct:free";
-  }
+// Gemini Model Configuration
+export const GEMINI_MODEL = "gemini-2.5-flash"; // Latest stable model (FREE tier, works with v1 API)
+// Alternative models you can try:
+// "gemini-2.5-pro" - More capable but slower (v1 API)
+// "gemini-1.5-flash" - Older fast model (may need v1beta)
+// "gemini-1.5-pro" - Older capable model (may need v1beta)
+// "gemini-pro" - Legacy model (may need v1beta)
+// Note: Model availability depends on your API key and API version
+
+export const getModelForTask = (_taskType: 'coding' | 'research' | 'general'): string => {
+  // Using Gemini for all task types - it handles everything well
+  // Task type is still detected but all tasks use the same Gemini model
+  return GEMINI_MODEL;
 };
 
 const modelDisplayNames = new Map([
-  ["deepseek/deepseek-r1-0528:free", "Deepseek"],
-  ["meta-llama/llama-4-maverick:free", "Llama 4 Maverick"],
-  ["mistralai/mistral-7b-instruct:free", "Mistral"]
+  ["gemini-2.5-flash", "Gemini 2.5 Flash"],
+  ["gemini-2.5-pro", "Gemini 2.5 Pro"],
+  ["gemini-2.0-flash-exp", "Gemini 2.0 Flash"],
+  ["gemini-1.5-flash", "Gemini 1.5 Flash"],
+  ["gemini-1.5-pro", "Gemini 1.5 Pro"],
+  ["gemini-1.5-flash-8b", "Gemini 1.5 Flash 8B"],
+  ["gemini-pro", "Gemini Pro"],
+  ["gemini-pro-vision", "Gemini Pro Vision"]
 ]);
 
 export const getModelDisplayName = (modelId: string): string => {
-  return modelDisplayNames.get(modelId) || modelId;
+  return modelDisplayNames.get(modelId) || "Gemini";
+};
+
+// Utility function to list available models (for debugging)
+export const listAvailableModels = async (apiKey: string): Promise<string[]> => {
+  try {
+    // Try v1 API first
+    const v1Url = `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`;
+    const v1Response = await fetch(v1Url);
+    
+    if (v1Response.ok) {
+      const v1Data = await v1Response.json();
+      if (v1Data.models && v1Data.models.length > 0) {
+        return v1Data.models.map((m: any) => m.name?.replace('models/', '') || m.name).filter(Boolean);
+      }
+    }
+    
+    // Try v1beta API if v1 doesn't work
+    const v1betaUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+    const v1betaResponse = await fetch(v1betaUrl);
+    
+    if (v1betaResponse.ok) {
+      const v1betaData = await v1betaResponse.json();
+      if (v1betaData.models && v1betaData.models.length > 0) {
+        return v1betaData.models.map((m: any) => m.name?.replace('models/', '') || m.name).filter(Boolean);
+      }
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error listing models:', error);
+    return [];
+  }
 };
 
 // Utility Functions
@@ -182,8 +223,8 @@ export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, 
 
 export const retryWithBackoff = async (
   fn: () => Promise<any>,
-  maxRetries: number = 3,
-  initialDelay: number = 1000
+  maxRetries: number = 2,
+  initialDelay: number = 5000 // Start with 5 seconds for rate limits
 ): Promise<any> => {
   let retries = 0;
   let delay = initialDelay;
@@ -192,13 +233,20 @@ export const retryWithBackoff = async (
     try {
       return await fn();
     } catch (error: any) {
-      if (retries >= maxRetries || error.status !== 429) {
-        throw error;
+      // For rate limit errors (429), wait longer before retrying
+      if (error.status === 429) {
+        if (retries >= maxRetries) {
+          throw error; // Don't retry forever
+        }
+        retries++;
+        // Wait longer for rate limits - exponential backoff with minimum 5 seconds
+        await sleep(Math.max(delay, 5000));
+        delay *= 2;
+        continue;
       }
       
-      retries++;
-      await sleep(delay);
-      delay *= 2; 
+      // For other errors, throw immediately (don't retry)
+      throw error;
     }
   }
 };
@@ -242,5 +290,95 @@ export const copyToClipboard = async (text: string): Promise<boolean> => {
   } catch (error) {
     console.error('Failed to copy to clipboard:', error);
     return false;
+  }
+};
+
+// Get conversation preview text (first user message or first 50 chars)
+export const getConversationPreview = (conversation: Conversation): string => {
+  const firstUserMessage = conversation.messages.find(msg => msg.sender === 'user');
+  if (firstUserMessage) {
+    const preview = firstUserMessage.content.trim();
+    return preview.length > 50 ? preview.slice(0, 50) + '...' : preview;
+  }
+  return 'No messages yet';
+};
+
+// Group conversations by date
+export type DateGroup = 'Today' | 'Yesterday' | 'This Week' | 'This Month' | 'Older';
+
+export interface GroupedConversations {
+  group: DateGroup;
+  conversations: Conversation[];
+}
+
+export const groupConversationsByDate = (conversations: Conversation[]): GroupedConversations[] => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const thisWeek = new Date(today);
+  thisWeek.setDate(thisWeek.getDate() - 7);
+  const thisMonth = new Date(today);
+  thisMonth.setMonth(thisMonth.getMonth() - 1);
+
+  const groups: { [key in DateGroup]: Conversation[] } = {
+    'Today': [],
+    'Yesterday': [],
+    'This Week': [],
+    'This Month': [],
+    'Older': [],
+  };
+
+  conversations.forEach(conv => {
+    const updatedAt = new Date(conv.updatedAt);
+    
+    if (updatedAt >= today) {
+      groups['Today'].push(conv);
+    } else if (updatedAt >= yesterday) {
+      groups['Yesterday'].push(conv);
+    } else if (updatedAt >= thisWeek) {
+      groups['This Week'].push(conv);
+    } else if (updatedAt >= thisMonth) {
+      groups['This Month'].push(conv);
+    } else {
+      groups['Older'].push(conv);
+    }
+  });
+
+  // Return only non-empty groups in order
+  const result: GroupedConversations[] = [];
+  const order: DateGroup[] = ['Today', 'Yesterday', 'This Week', 'This Month', 'Older'];
+  
+  order.forEach(group => {
+    if (groups[group].length > 0) {
+      result.push({ group, conversations: groups[group] });
+    }
+  });
+
+  return result;
+};
+
+// Format relative date for conversation list
+export const formatRelativeDate = (date: Date): string => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const conversationDate = new Date(date);
+  const conversationDay = new Date(conversationDate.getFullYear(), conversationDate.getMonth(), conversationDate.getDate());
+  
+  const diffTime = today.getTime() - conversationDay.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return formatTimestamp(date);
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays < 7) {
+    return conversationDate.toLocaleDateString('en-US', { weekday: 'short' });
+  } else if (diffDays < 30) {
+    return `${diffDays} days ago`;
+  } else if (conversationDate.getFullYear() === now.getFullYear()) {
+    return conversationDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } else {
+    return conversationDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 }; 
