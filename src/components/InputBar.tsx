@@ -9,41 +9,19 @@ interface InputBarProps {
   onSend: () => void;
 }
 
-export const InputBar: React.FC<InputBarProps> = ({
-  input,
-  isLoading,
-  onInputChange,
-  onSend,
-}) => {
+export const InputBar = ({ input, isLoading, onInputChange, onSend }: InputBarProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    // Auto-focus textarea on mount
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
+    textareaRef.current?.focus();
   }, []);
 
-  // Auto-resize textarea
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const scrollHeight = textareaRef.current.scrollHeight;
-      const maxHeight = 120; // Max 5 lines approx
-      textareaRef.current.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
-    }
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
   }, [input]);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      onSend();
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onInputChange(e.target.value);
-  };
 
   return (
     <div className="input-bar">
@@ -51,24 +29,15 @@ export const InputBar: React.FC<InputBarProps> = ({
         ref={textareaRef}
         placeholder="Type your message..."
         value={input}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
+        onChange={(e) => onInputChange(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), onSend())}
         disabled={isLoading}
         className="input-field"
         rows={1}
         aria-label="Message input"
       />
-      <button
-        onClick={onSend}
-        disabled={isLoading || !input.trim()}
-        className="send-button"
-        aria-label="Send message"
-      >
-        {isLoading ? (
-          <span className="input-spinner"></span>
-        ) : (
-          <FiSend size={22} />
-        )}
+      <button onClick={onSend} disabled={isLoading || !input.trim()} className="send-button" aria-label="Send message">
+        {isLoading ? <span className="input-spinner"></span> : <FiSend size={22} />}
       </button>
     </div>
   );

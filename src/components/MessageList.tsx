@@ -10,38 +10,23 @@ interface MessageListProps {
   onCopy: (text: string, index: number) => void;
 }
 
-export const MessageList: React.FC<MessageListProps> = ({
-  messages,
-  showTimestamps,
-  copiedIndex,
-  isLoading,
-  onCopy,
-}) => {
-  return (
-    <div className="message-list">
-      {messages.map((msg, idx) => (
-        <MessageBubble
-          key={msg.id || idx}
-          message={msg}
-          index={idx}
-          showTimestamps={showTimestamps}
-          copiedIndex={copiedIndex}
-          onCopy={onCopy}
-        />
-      ))}
-      {isLoading && (
-        <div className="message-bubble bot typing-indicator-container">
-          <div className="message-content">
-            <div className="typing-indicator">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-            <div className="typing-text">AI is thinking...</div>
+export const MessageList = ({ messages, showTimestamps, copiedIndex, isLoading, onCopy }: MessageListProps) => (
+  <div className="message-list">
+    {messages.map((msg, idx) => (
+      <MessageBubble key={msg.id || idx} message={msg} index={idx} showTimestamps={showTimestamps} copiedIndex={copiedIndex} onCopy={onCopy} />
+    ))}
+    {isLoading && (
+      <div className="message-bubble bot typing-indicator-container">
+        <div className="message-content">
+          <div className="typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
           </div>
+          <div className="typing-text">AI is thinking...</div>
         </div>
-      )}
-    </div>
-  );
-};
+      </div>
+    )}
+  </div>
+);
 

@@ -1,11 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { FiPlus, FiTrash2, FiMessageCircle, FiX } from 'react-icons/fi';
 import type { Conversation } from '../types/chat';
-import {
-  groupConversationsByDate,
-  getConversationPreview,
-  formatRelativeDate,
-} from '../utils/chatUtils';
+import { groupConversationsByDate, getConversationPreview, formatRelativeDate } from '../utils/chatUtils';
 import './Sidebar.css';
 
 interface SidebarProps {
@@ -18,44 +14,25 @@ interface SidebarProps {
   onDeleteConversation?: (conversationId: string) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
-  isOpen,
-  conversations,
-  currentConversationId,
-  onClose,
-  onNewConversation,
-  onSelectConversation,
-  onDeleteConversation,
-}) => {
-  const [hoveredConversationId, setHoveredConversationId] = useState<string | null>(null);
+export const Sidebar = ({ isOpen, conversations, currentConversationId, onClose, onNewConversation, onSelectConversation, onDeleteConversation }: SidebarProps) => {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const groupedConversations = groupConversationsByDate(
-    conversations.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-  );
+  const groupedConversations = groupConversationsByDate([...conversations].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
 
-  const handleDeleteClick = (e: React.MouseEvent, conversationId: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (deletingId === conversationId) {
-      if (onDeleteConversation) {
-        onDeleteConversation(conversationId);
-      }
+    if (deletingId === id) {
+      onDeleteConversation?.(id);
       setDeletingId(null);
     } else {
-      setDeletingId(conversationId);
-      setTimeout(() => {
-        setDeletingId(null);
-      }, 3000);
+      setDeletingId(id);
+      setTimeout(() => setDeletingId(null), 3000);
     }
   };
 
   const handleItemClick = (conv: Conversation) => {
-    if (deletingId === conv.id) {
-      // If deleting, cancel deletion on click
-      setDeletingId(null);
-    } else {
-      onSelectConversation(conv);
-    }
+    deletingId === conv.id ? setDeletingId(null) : onSelectConversation(conv);
   };
 
   return (
@@ -94,20 +71,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 {groupConvs.map((conv) => {
                   const isActive = currentConversationId === conv.id;
-                  const isHovered = hoveredConversationId === conv.id;
+                  const isHovered = hoveredId === conv.id;
                   const isDeleting = deletingId === conv.id;
-                  const messageCount = conv.messages.length;
                   const preview = getConversationPreview(conv);
 
                   return (
                     <div
                       key={conv.id}
-                      className={`conversation-item ${
-                        isActive ? 'active' : ''
-                      } ${isDeleting ? 'deleting' : ''}`}
+                      className={`conversation-item ${isActive ? 'active' : ''} ${isDeleting ? 'deleting' : ''}`}
                       onClick={() => handleItemClick(conv)}
-                      onMouseEnter={() => setHoveredConversationId(conv.id)}
-                      onMouseLeave={() => setHoveredConversationId(null)}
+                      onMouseEnter={() => setHoveredId(conv.id)}
+                      onMouseLeave={() => setHoveredId(null)}
                     >
                       <div className="conversation-icon">
                         <FiMessageCircle size={16} />
@@ -115,19 +89,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className="conversation-content">
                         <div className="conversation-header">
                           <div className="conversation-title">{conv.title}</div>
-                          {messageCount > 0 && (
-                            <span className="conversation-badge">
-                              {messageCount}
-                            </span>
-                          )}
+                          {conv.messages.length > 0 && <span className="conversation-badge">{conv.messages.length}</span>}
                         </div>
-                        {preview && (
-                          <div className="conversation-preview">{preview}</div>
-                        )}
+                        {preview && <div className="conversation-preview">{preview}</div>}
                         <div className="conversation-footer">
-                          <div className="conversation-date">
-                            {formatRelativeDate(conv.updatedAt)}
-                          </div>
+                          <div className="conversation-date">{formatRelativeDate(conv.updatedAt)}</div>
                         </div>
                       </div>
                       {onDeleteConversation && (

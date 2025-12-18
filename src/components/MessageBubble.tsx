@@ -11,15 +11,9 @@ interface MessageBubbleProps {
   onCopy: (text: string, index: number) => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({
-  message,
-  index,
-  showTimestamps,
-  copiedIndex,
-  onCopy,
-}) => {
+export const MessageBubble = ({ message, index, showTimestamps, copiedIndex, onCopy }: MessageBubbleProps) => {
   const isUser = message.sender === 'user';
-  const isCopied = copiedIndex === index;
+  const showTimestamp = showTimestamps && message.timestamp;
 
   return (
     <div className={`message-bubble ${isUser ? 'user' : 'bot'}`}>
@@ -27,32 +21,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {isUser ? (
           <>
             <div className="user-message-text">{message.content}</div>
-            {showTimestamps && message.timestamp && (
-              <div className="message-timestamp">
-                {formatTimestamp(message.timestamp)}
-              </div>
-            )}
+            {showTimestamp && <div className="message-timestamp">{formatTimestamp(message.timestamp)}</div>}
           </>
         ) : (
           <>
-            <div
-              className="bot-message-text"
-              dangerouslySetInnerHTML={{
-                __html: marked.parse(message.content, { async: false }),
-              }}
-            />
-            {showTimestamps && message.timestamp && (
-              <div className="message-timestamp">
-                {formatTimestamp(message.timestamp)}
-              </div>
-            )}
-            <button
-              className="copy-button"
-              onClick={() => onCopy(markdownToPlainText(message.content), index)}
-              title="Copy to clipboard"
-              aria-label="Copy message"
-            >
-              {isCopied ? 'Copied!' : 'Copy'}
+            <div className="bot-message-text" dangerouslySetInnerHTML={{ __html: marked.parse(message.content, { async: false }) }} />
+            {showTimestamp && <div className="message-timestamp">{formatTimestamp(message.timestamp)}</div>}
+            <button className="copy-button" onClick={() => onCopy(markdownToPlainText(message.content), index)} title="Copy to clipboard" aria-label="Copy message">
+              {copiedIndex === index ? 'Copied!' : 'Copy'}
             </button>
           </>
         )}

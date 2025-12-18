@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Message, Conversation, ChatSettings } from '../types/chat';
 import {
-  detectTaskType,
-  getModelForTask,
-  retryWithBackoff,
+  LLAMA_MODEL,
   generateConversationId,
   generateMessageId,
   saveConversation,
@@ -101,7 +99,6 @@ const Deepseek = () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-
     setCurrentConversation(newConversation);
     setMessages([]);
     setConversations((prev) => [newConversation, ...prev]);
@@ -117,21 +114,9 @@ const Deepseek = () => {
     deleteConversation(conversationId);
     setConversations((prev) => {
       const filtered = prev.filter((c) => c.id !== conversationId);
-      
-      // If the deleted conversation was the current one, load another or start new
       if (currentConversation?.id === conversationId) {
-        if (filtered.length > 0) {
-          // Use setTimeout to ensure state update happens after this one
-          setTimeout(() => {
-            loadConversation(filtered[0]);
-          }, 0);
-        } else {
-          setTimeout(() => {
-            startNewConversation();
-          }, 0);
-        }
+        setTimeout(() => filtered.length > 0 ? loadConversation(filtered[0]) : startNewConversation(), 0);
       }
-      
       return filtered;
     });
   };
@@ -143,8 +128,7 @@ const Deepseek = () => {
   };
 
   const handleCopyMessage = async (text: string, idx: number) => {
-    const success = await copyToClipboard(text);
-    if (success) {
+    if (await copyToClipboard(text)) {
       setCopiedIdx(idx);
       setTimeout(() => setCopiedIdx(null), 1200);
     }
@@ -152,16 +136,8 @@ const Deepseek = () => {
 
   const exportCurrentConversation = () => {
     if (!currentConversation) return;
-
-    const updatedConversation = {
-      ...currentConversation,
-      messages,
-      updatedAt: new Date(),
-    };
-
-    const dataStr = exportConversation(updatedConversation);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
+    const blob = new Blob([exportConversation({ ...currentConversation, messages, updatedAt: new Date() })], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = `conversation-${currentConversation.id}.json`;
@@ -169,14 +145,12 @@ const Deepseek = () => {
     URL.revokeObjectURL(url);
   };
 
-  async function sendMessage() {
+  const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
-    // Throttle requests to prevent rate limit issues (2 seconds between requests)
     const now = Date.now();
     if (now - lastRequestTime.current < REQUEST_COOLDOWN) {
-      const waitTime = Math.ceil((REQUEST_COOLDOWN - (now - lastRequestTime.current)) / 1000);
-      alert(`Please wait ${waitTime} second(s) before sending another message to avoid rate limits.`);
+      alert(`Please wait ${Math.ceil((REQUEST_COOLDOWN - (now - lastRequestTime.current)) / 1000)} second(s) before sending another message.`);
       return;
     }
     lastRequestTime.current = now;
@@ -194,194 +168,70 @@ const Deepseek = () => {
     setMessages((msgs) => [...msgs, userMessage]);
 
     try {
-      const taskType = detectTaskType(userMessage.content);
-      const selectedModel = getModelForTask(taskType);
       const apiKey = import.meta.env.VITE_API_KEY;
+      if (!apiKey) throw new Error('API key is not set. Please add VITE_API_KEY to your .env file');
 
-      if (!apiKey) {
-        throw new Error('API key is not set. Please add VITE_API_KEY to your .env file');
+      const conversationHistory = messages.slice(-10)
+        .filter((msg) => msg.content?.trim())
+        .map((msg) => ({ role: msg.sender === 'user' ? 'user' : 'assistant' as const, content: msg.content }));
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: LLAMA_MODEL,
+          messages: [{ role: "system", content: "You are a helpful assistant." }, ...conversationHistory, { role: "user", content: userMessage.content }],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `HTTP error: ${response.status}`);
       }
 
-      // Build system instruction based on task type
-      const systemInstruction =
-        taskType === 'coding'
-          ? 'You are a helpful programming assistant. Provide clear, well-documented code examples with explanations.'
-          : taskType === 'research'
-          ? 'You are a research assistant. Provide detailed, well-researched responses with citations and explanations.'
-          : 'You are a helpful assistant. Provide clear and concise responses.';
-
-      // Get conversation history for context (limit to last 5 message pairs to avoid rate limits)
-      const recentMessages = messages.slice(-10);
-      const conversationHistory = recentMessages
-        .filter((msg) => msg.content && msg.content.trim().length > 0)
-        .map((msg) => ({
-          role: msg.sender === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.content }],
-        }));
-
-      const makeRequest = async () => {
-        // Gemini API endpoint
-        // v1 API supports newer models like gemini-2.5-flash and gemini-2.5-pro
-        // v1beta supports older models like gemini-1.5-flash and gemini-pro
-        // Try v1 first for newer models, fallback to v1beta for older models
-        const useV1Beta = selectedModel.includes('1.5') || selectedModel === 'gemini-pro' || selectedModel === 'gemini-pro-vision';
-        const apiVersion = useV1Beta ? 'v1beta' : 'v1';
-        const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${selectedModel}:generateContent?key=${apiKey}`;
-
-        // Build request payload for Gemini API
-        const requestBody: any = {
-          contents: [
-            ...conversationHistory,
-            {
-              role: 'user',
-              parts: [{ text: userMessage.content }],
-            },
-          ],
-          generationConfig: {
-            temperature: taskType === 'coding' ? 0.3 : taskType === 'research' ? 0.5 : 0.7,
-            topP: 0.95,
-            topK: 40,
-            maxOutputTokens: taskType === 'coding' ? 2048 : taskType === 'research' ? 1536 : 1024,
-          },
-        };
-
-        // Add system instruction (format differs by API version)
-        if (systemInstruction) {
-          if (apiVersion === 'v1beta') {
-            // v1beta supports systemInstruction field at root level
-            requestBody.systemInstruction = {
-              parts: [{ text: systemInstruction }],
-            };
-          } else {
-            // v1 API: prepend system instruction as first message in contents
-            requestBody.contents = [
-              {
-                role: 'user',
-                parts: [{ text: systemInstruction }],
-              },
-              ...requestBody.contents,
-            ];
-          }
-        }
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          let errorMessage = `HTTP error! status: ${response.status}`;
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error?.message || errorData.error?.details?.[0]?.message || errorMessage;
-            // Handle common Gemini API errors
-            if (response.status === 400) {
-              errorMessage = errorMessage || 'Invalid request. Please check your API key and request format.';
-            } else if (response.status === 429) {
-              errorMessage = 'Rate limit exceeded. Please wait a moment before trying again.';
-            } else if (response.status === 401) {
-              errorMessage = 'Invalid API key. Please check your VITE_API_KEY in .env file.';
-            }
-          } catch {
-            // If parsing fails, use default message
-          }
-          const error = new Error(errorMessage);
-          (error as any).status = response.status;
-          throw error;
-        }
-
-        return response;
-      };
-
-      const response = await retryWithBackoff(makeRequest, 2, 5000); // Max 2 retries, 5s initial delay
       const data = await response.json();
-      
-      // Check for errors in Gemini response
-      if (data.error) {
-        throw new Error(data.error.message || 'Error from Gemini API');
-      }
-      
-      // Extract text from Gemini response format
-      const candidate = data.candidates?.[0];
-      if (!candidate || !candidate.content) {
-        throw new Error('No response from Gemini API');
-      }
-      
-      const markdownText = candidate.content.parts?.[0]?.text || 'No response from the model';
-      
-      // Check for finish reason (safety filters, etc.)
-      if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-        console.warn('Gemini finish reason:', candidate.finishReason);
-      }
-
-      const updatedBotMessage: Message = {
+      const botMessage: Message = {
         id: generateMessageId(),
         sender: 'bot',
-        content: markdownText,
-        model: selectedModel,
+        content: data.choices?.[0]?.message?.content || 'No response',
         timestamp: new Date(),
         status: 'sent',
       };
 
-      setMessages((msgs) => [...msgs, updatedBotMessage]);
+      setMessages((msgs) => [...msgs, botMessage]);
 
-      // Update conversation
       if (currentConversation) {
         const updatedConversation = {
           ...currentConversation,
-          title:
-            currentConversation.messages.length === 0
-              ? generateConversationTitle(userMessage.content)
-              : currentConversation.title,
-          messages: [...messages, userMessage, updatedBotMessage],
+          title: currentConversation.messages.length === 0 ? generateConversationTitle(userMessage.content) : currentConversation.title,
+          messages: [...messages, userMessage, botMessage],
           updatedAt: new Date(),
         };
-
         setCurrentConversation(updatedConversation);
         saveConversation(updatedConversation);
-        setConversations((prev) =>
-          prev.map((c) => (c.id === updatedConversation.id ? updatedConversation : c))
-        );
+        setConversations((prev) => prev.map((c) => (c.id === updatedConversation.id ? updatedConversation : c)));
       }
     } catch (error: any) {
-      console.error('Error details:', error);
-      let errorMessage = 'An error occurred. Please try again later.';
-
-      if (error.status === 429) {
-        errorMessage = 'Rate limit exceeded. Gemini free tier allows 15 requests per minute. Please wait 60 seconds before trying again.';
-      } else if (error.status === 401) {
-        errorMessage = 'Invalid API key. Please check your VITE_API_KEY in .env file and restart the server.';
-      } else if (error.status === 400) {
-        errorMessage = error.message || 'Invalid request. Please check your API key and request format.';
-      } else if (error.message && error.message.includes('API key')) {
-        errorMessage = 'API key error. Please check your .env file and restart the server.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      const errorBotMessage: Message = {
+      console.error('Error:', error);
+      const errorMessages: Record<number, string> = {
+        429: 'Rate limit exceeded. Please wait a moment before trying again.',
+        401: 'Invalid API key. Please check your VITE_API_KEY in .env file.',
+        400: error.message || 'Invalid request. Please check your API key.',
+      };
+      const errorMessage = errorMessages[error.status] || error.message || 'An error occurred. Please try again later.';
+      setMessages((msgs) => [...msgs, {
         id: generateMessageId(),
         sender: 'bot',
         content: errorMessage,
         timestamp: new Date(),
         status: 'error',
-      };
-
-      setMessages((msgs) => [...msgs, errorBotMessage]);
+      }]);
     } finally {
       setIsLoading(false);
     }
-  }
-
-  const toggleTheme = () => {
-    setSettings((prev) => ({
-      ...prev,
-      theme: prev.theme === 'light' ? 'dark' : 'light',
-    }));
   };
+
+  const toggleTheme = () => setSettings((prev) => ({ ...prev, theme: prev.theme === 'light' ? 'dark' : 'light' }));
 
   return (
     <div className="chat-app-container">

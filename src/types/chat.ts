@@ -1,9 +1,12 @@
+export type MessageSender = 'user' | 'bot';
+export type MessageStatus = 'sending' | 'sent' | 'error';
+export type Theme = 'light' | 'dark';
+
 export interface Message {
-  sender: 'user' | 'bot';
+  sender: MessageSender;
   content: string;
-  model?: string;
   timestamp?: Date;
-  status?: 'sending' | 'sent' | 'error';
+  status?: MessageStatus;
   id?: string;
 }
 
@@ -16,7 +19,7 @@ export interface Conversation {
 }
 
 export interface ChatSettings {
-  theme: 'light' | 'dark';
+  theme: Theme;
   language: string;
   autoScroll: boolean;
   showTimestamps: boolean;
